@@ -57,7 +57,7 @@ const TestFileUploadZone = ({
               }
               const cappedDatasetArray = datasetArray.slice(
                 0,
-                Math.min(15, datasetArray.length)
+                Math.min(50, datasetArray.length)
               );
               const uploadedTestDataset = cappedDatasetArray.map((row) => ({
                 question: row?.[0],

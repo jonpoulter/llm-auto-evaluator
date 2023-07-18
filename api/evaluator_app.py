@@ -33,9 +33,44 @@ from langchain.embeddings import LlamaCppEmbeddings
 from langchain.embeddings import MosaicMLInstructorEmbeddings
 from fastapi import FastAPI, File, UploadFile, Form
 from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains.question_answering import load_qa_chain
 from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
-from text_utils import GRADE_DOCS_PROMPT, GRADE_ANSWER_PROMPT, GRADE_DOCS_PROMPT_FAST, GRADE_ANSWER_PROMPT_FAST, GRADE_ANSWER_PROMPT_BIAS_CHECK, GRADE_ANSWER_PROMPT_OPENAI, QA_CHAIN_PROMPT, QA_CHAIN_PROMPT_LLAMA
+from text_utils import GRADE_DOCS_PROMPT, GRADE_ANSWER_PROMPT, GRADE_DOCS_PROMPT_FAST, GRADE_ANSWER_PROMPT_FAST, GRADE_ANSWER_PROMPT_BIAS_CHECK, GRADE_ANSWER_PROMPT_OPENAI, QA_CHAIN_PROMPT, QA_CHAIN_PROMPT_LLAMA, QA_WITH_SOURCES_CHAIN_PROMPT
+from langchain.llms import AzureOpenAI
+from langchain.embeddings import OpenAIEmbeddings as AzureOpenAIEmbeddings
+from langchain.chat_models import AzureChatOpenAI
+import openai
+
+load_dotenv()
+
+if os.environ.get("OPENAI_API_TYPE") == "azure":
+    #init Azure OpenAI
+    openai.api_type = "azure"
+    openai.api_version = os.getenv("AZURE_OPENAI_DEPLOYMENT_VERSION")
+    openai.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
+    openai.api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+    #azure llm needs these set as environment variable - perhaps because of Langchain wrapper 
+    os.environ["OPENAI_API_KEY"] = os.environ.get("AZURE_OPENAI_API_KEY")
+    os.environ["OPENAI_API_VERSION"] = os.environ.get("AZURE_OPENAI_DEPLOYMENT_VERSION")
+    os.environ["OPENAI_API_BASE"] = os.environ.get("AZURE_OPENAI_ENDPOINT")
+    os.environ["OPENAI_API_TYPE"] = "azure"
+else:
+    openai.api_key = os.environ.get("OPENAI_OPENAI_API_KEY")
+    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_OPENAI_API_KEY")
+
+
+
+
+
+#def set_env_openai():
+#        os.environ.pop("OPENAI_API_TYPE") 
+#    if os.environ.get("OPENAI_API_TYPE"):
+#    os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_OPENAI_API_KEY")
+#    if os.environ.get("OPENAI_API_BASE"):
+#        os.environ.pop("OPENAI_API_BASE")
+#    if os.environ.get("OPENAI_API_VERSION"):
+#        os.environ.pop("OPENAI_API_VERSION")
 
 def generate_eval(text, chunk, logger):
     """
@@ -52,7 +87,13 @@ def generate_eval(text, chunk, logger):
     starting_index = random.randint(0, num_of_chars-chunk)
     sub_sequence = text[starting_index:starting_index+chunk]
     # Set up QAGenerationChain chain using GPT 3.5 as default
-    chain = QAGenerationChain.from_llm(ChatOpenAI(temperature=0))
+    #chain = QAGenerationChain.from_llm(ChatOpenAI(temperature=0))
+    chain = QAGenerationChain.from_llm(AzureChatOpenAI(deployment_name="verifi-gpt-35-turbo", 
+                              model_name="gpt-35-turbo", 
+                              openai_api_base=os.getenv("OPENAI_API_BASE"),
+                              openai_api_version=os.getenv("OPENAI_API_VERSION"),
+                              openai_api_key=os.getenv("OPENAI_API_KEY"),
+                              temperature=0))
     eval_set = []
     # Catch any QA generation errors and re-try until QA pair is generated
     awaiting_answer = True
@@ -92,7 +133,7 @@ def split_texts(text, chunk_size, overlap, split_method, logger):
     return splits
 
 
-def make_llm(model):
+def make_llm(model, logger):
     """
     Make LLM
     @param model: LLM to use
@@ -110,6 +151,25 @@ def make_llm(model):
                 input={"temperature": 0.75, "max_length": 3000, "top_p":0.25})
     elif model == "mosaic":
         llm = MosaicML(inject_instruction_format=True,model_kwargs={'do_sample': False, 'max_length': 3000})
+    elif model == "falcon-7b":
+        llm = Replicate(model="own-ai/oasst-falcon-7b-sft-top1-696:53032738862a3285f1517b2d2d92e82fe76dede87ba654956dd1e2eae4aa549c",
+                       input={"temperature":0.75, "max_length": 3000, "top_p":0.25})
+    elif model == "flan-t5-xl":
+        llm = Replicate(model="replicate/flan-t5-xl:7a216605843d87f5426a10d2cc6940485a232336ed04d655ef86b91e020e9210",
+                        input={"temperature": 0.75, "max_length": 3000, "top_p":0.25})
+    elif model == "stablelm-tuned-alpha-7b":
+        llm = Replicate(model="stability-ai/stablelm-tuned-alpha-7b:c49dae362cbaecd2ceabb5bd34fdb68413c4ff775111fea065d259d577757beb",
+                        input={"temperature": 0.75, "max_length": 3000, "top_p":0.25})
+    elif model == 'azure-gpt-3.5-turbo':
+        #set_env_azure_openai()
+        llm = AzureChatOpenAI(deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"), 
+                              model_name=os.getenv("AZURE_OPENAI_MODEL_NAME"), 
+                              openai_api_base=os.getenv("OPENAI_API_BASE"),
+                              openai_api_version=os.getenv("OPENAI_API_VERSION"),
+                              openai_api_key=os.getenv("OPENAI_API_KEY"),
+                              temperature=0)
+        
+    logger.info(f'llm = {llm}')
     return llm
 
 def make_retriever(splits, retriever_type, embeddings, num_neighbors, llm, logger):
@@ -128,12 +188,17 @@ def make_retriever(splits, retriever_type, embeddings, num_neighbors, llm, logge
     # Set embeddings
     if embeddings == "OpenAI":
         embd = OpenAIEmbeddings()
+    elif embeddings == "Azure OpenAI":
+        # deployment name must be set to `text-embedding-ada-002` due to lack of deployment name field in langchain
+        embd = AzureOpenAIEmbeddings(chunk_size=1)
     # Note: Still WIP (can't be selected by user yet)
     elif embeddings == "LlamaCppEmbeddings":
         embd = LlamaCppEmbeddings(model="replicate/vicuna-13b:e6d469c2b11008bb0e446c3e9629232f9674581224536851272c54871f84076e")
     # Note: Test
     elif embeddings == "Mosaic":
         embd = MosaicMLInstructorEmbeddings(query_instruction="Represent the query for retrieval: ")
+    elif embeddings == "HuggingFace":
+        embd = HuggingFaceEmbeddings()
 
     # Select retriever
     if retriever_type == "similarity-search":
@@ -147,7 +212,7 @@ def make_retriever(splits, retriever_type, embeddings, num_neighbors, llm, logge
          retriever = llm
     return retriever
 
-def make_chain(llm, retriever, retriever_type, model):
+def make_chain(llm, retriever, retriever_type, model,logger):
 
     """
     Make retrieval chain
@@ -156,7 +221,7 @@ def make_chain(llm, retriever, retriever_type, model):
     @param retriever_type: retriever type
     @return: QA chain
     """
-
+    logger.info("Making chain")
     # Select prompt 
     if model == "vicuna-13b":
         # Note: Better answer quality using default prompt 
@@ -198,7 +263,14 @@ def grade_model_answer(predicted_dataset, predictions, grade_answer_prompt, logg
         prompt = GRADE_ANSWER_PROMPT
 
     # Note: GPT-4 grader is advised by OAI 
-    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
+   #eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
+   #                                   prompt=prompt)
+    eval_chain = QAEvalChain.from_llm(llm=AzureChatOpenAI(deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"), 
+                              model_name=os.getenv("AZURE_OPENAI_MODEL_NAME"), 
+                              openai_api_base=os.getenv("OPENAI_API_BASE"),
+                              openai_api_version=os.getenv("OPENAI_API_VERSION"),
+                              openai_api_key=os.getenv("OPENAI_API_KEY"),
+                              temperature=0),
                                       prompt=prompt)
     graded_outputs = eval_chain.evaluate(predicted_dataset,
                                          predictions,
@@ -223,7 +295,14 @@ def grade_model_retrieval(gt_dataset, predictions, grade_docs_prompt, logger):
         prompt = GRADE_DOCS_PROMPT
 
     # Note: GPT-4 grader is advised by OAI
-    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
+    #eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
+    #                                  prompt=prompt)
+    eval_chain = QAEvalChain.from_llm(llm=AzureChatOpenAI(deployment_name=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"), 
+                              model_name=os.getenv("AZURE_OPENAI_MODEL_NAME"), 
+                              openai_api_base=os.getenv("OPENAI_API_BASE"),
+                              openai_api_version=os.getenv("OPENAI_API_VERSION"),
+                              openai_api_key=os.getenv("OPENAI_API_KEY"),
+                              temperature=0),
                                       prompt=prompt)
     graded_outputs = eval_chain.evaluate(gt_dataset,
                                          predictions,
@@ -291,13 +370,15 @@ def run_eval(chain, retriever, eval_qa_pair, grade_prompt, retriever_type, num_n
         gt_dataset, retrieved_docs, grade_prompt, logger)
     return graded_answers, graded_retrieval, latency, predictions
 
-load_dotenv()
+#load_dotenv()
 
 if os.environ.get("ENVIRONMENT") != "development":
     sentry_sdk.init(
     dsn="https://065aa152c4de4e14af9f9e7335c8eae4@o4505106202820608.ingest.sentry.io/4505106207735808",
     traces_sample_rate=1.0,
     )
+
+
 
 app = FastAPI()
 
@@ -375,14 +456,14 @@ def run_evaluator(
         splits = split_texts(text, chunk_chars, overlap, split_method, logger)
 
     logger.info("Make LLM")
-    llm = make_llm(model_version)
+    llm = make_llm(model_version, logger)
 
     logger.info("Make retriever")
     retriever = make_retriever(
         splits, retriever_type, embeddings, num_neighbors, llm, logger)
 
     logger.info("Make chain")
-    qa_chain = make_chain(llm, retriever, retriever_type, model_version)
+    qa_chain = make_chain(llm, retriever, retriever_type, model_version, logger)
 
     for i in range(num_eval_questions):
 

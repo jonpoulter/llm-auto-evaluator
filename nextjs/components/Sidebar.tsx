@@ -34,8 +34,15 @@ const Sidebar = ({ form }: { form: Form }) => {
                     { value: 5, label: "5" },
                     { value: 10, label: "10" },
                     { value: 15, label: "15" },
+                    { value: 20, label: "20" },
+                    { value: 25, label: "25" },
+                    { value: 30, label: "30" },
+                    { value: 35, label: "35" },
+                    { value: 40, label: "40" },
+                    { value: 45, label: "45" },
+                    { value: 50, label: "50" }
                   ]}
-                  max={15}
+                  max={50}
                   min={1}
                   step={1}
                 />
@@ -52,14 +59,15 @@ const Sidebar = ({ form }: { form: Form }) => {
                   {...field}
                   labelTransition="skew-down"
                   marks={[
+                    { value: 250, label: "250"},
                     { value: 500, label: "500" },
                     { value: 1000, label: "1000" },
                     { value: 1500, label: "1500" },
                     { value: 2000, label: "2000" },
                   ]}
                   max={2000}
-                  min={500}
-                  step={100}
+                  min={250}
+                  step={50}
                 />
               )}
             />
@@ -100,6 +108,10 @@ const Sidebar = ({ form }: { form: Form }) => {
                     { label: "Anthropic", value: "anthropic" },
                     { label: "Vicuna 13B", value: "vicuna-13b" },
                     { label: "MPT-7B", value: "mosaic" },
+                    { label: "Flan T5", value: "flan-t5-xl" },
+                    { label: "Stability AI Alpha 7B", value: "stablelm-tuned-alpha-7b"},
+                    { label: "Falcon 7B", value: "falcon-7b" },
+                    { label: "Azure GPT 3.5 Turbo", value: "azure-gpt-3.5-turbo"}
                   ]}
                 />
               )}
@@ -140,6 +152,14 @@ const Sidebar = ({ form }: { form: Form }) => {
                       label: "OpenAI",
                       value: "OpenAI",
                     },
+                    {
+                      label: "HuggingFace",
+                      value: "HuggingFace"
+                    },
+                    {
+                      label: "Azure OpenAI",
+                      value: "Azure OpenAI"
+                    }
                   ]}
                 />
               )}
@@ -190,8 +210,11 @@ const Sidebar = ({ form }: { form: Form }) => {
                     { value: 3, label: "3" },
                     { value: 4, label: "4" },
                     { value: 5, label: "5" },
+                    { value: 6, label: "6" },
+                    { value: 7, label: "7" },
+                    { value: 8, label: "8" }
                   ]}
-                  max={5}
+                  max={8}
                   min={3}
                   step={1}
                 />

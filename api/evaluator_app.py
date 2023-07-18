@@ -198,7 +198,7 @@ def grade_model_answer(predicted_dataset, predictions, grade_answer_prompt, logg
         prompt = GRADE_ANSWER_PROMPT
 
     # Note: GPT-4 grader is advised by OAI 
-    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-4", temperature=0),
+    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
                                       prompt=prompt)
     graded_outputs = eval_chain.evaluate(predicted_dataset,
                                          predictions,
@@ -223,7 +223,7 @@ def grade_model_retrieval(gt_dataset, predictions, grade_docs_prompt, logger):
         prompt = GRADE_DOCS_PROMPT
 
     # Note: GPT-4 grader is advised by OAI
-    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-4", temperature=0),
+    eval_chain = QAEvalChain.from_llm(llm=ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0),
                                       prompt=prompt)
     graded_outputs = eval_chain.evaluate(gt_dataset,
                                          predictions,
